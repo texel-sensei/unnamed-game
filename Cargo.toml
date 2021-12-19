@@ -10,3 +10,7 @@ edition = "2021"
 ggez = "0.6"
 tego = "0.4"
 glam = { version = "0.20", features = ["mint"] }
+
+[profile.dev]
+opt-level = 1
+debug = true
