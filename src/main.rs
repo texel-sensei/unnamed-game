@@ -36,7 +36,7 @@ struct Player;
 struct Velocity(Vec3);
 
 fn setup(mut commands: Commands, asset_server: Res<AssetServer>) {
-    let texture_handle = asset_server.load("tiles.png");
+    let texture_handle = asset_server.load("awesome-square.png");
     commands.spawn_bundle(OrthographicCameraBundle::new_2d());
     commands.spawn_bundle(SpriteBundle {
         texture: texture_handle,
@@ -45,7 +45,8 @@ fn setup(mut commands: Commands, asset_server: Res<AssetServer>) {
     }).insert(Player);
 }
 
-/// This system prints 'A' key state
+
+/// This system moves the square
 fn keyboard_input_system(mut query: Query<&mut Transform, With<Player>>, keyboard_input: Res<Input<KeyCode>>) {
     let mut delta = Vec3::default();
     let mut size_delta = Vec3::default();
