@@ -1,5 +1,5 @@
 //! Basic hello world example.
-use bevy::prelude::*;
+use bevy::{prelude::*, input::system::exit_on_esc_system};
 
 //                                      /;    ;\
 //                                  __  \\____//
@@ -25,6 +25,7 @@ fn main() {
         .add_plugins(DefaultPlugins)
         .add_startup_system(setup)
         .add_system(keyboard_input_system)
+        .add_system(exit_on_esc_system)
         .run();
 }
 
