@@ -24,12 +24,17 @@ use bevy::{input::system::exit_on_esc_system, prelude::*};
 // Enum that will be used as a global state for the game
 #[derive(Clone, Eq, PartialEq, Debug, Hash)]
 enum GameState {
-    Splash,
+    About,
+    Error,
     Game,
+    Lobby,
+    Settings,
+    Splash,
 }
 
 fn main() {
-    App::new()
+    let mut app = App::new();
+    app
         .add_plugins(DefaultPlugins)
         .add_startup_system(setup)
         .add_system(keyboard_input_system)
@@ -38,7 +43,38 @@ fn main() {
         .add_state(GameState::Splash)
         .add_plugin(splash::SplashPlugin)
         // .add_plugin(game::GamePlugin)
-        .run();
+        ;
+
+    for state in vec![About, Error, Game, Lobby, Settings, Splash] {
+        app.add_system_set(SystemSet::on_enter(state).with_system(print_state_system));
+    }
+
+    use GameState::*;
+    for state in vec![About, Lobby, Settings] {
+        app.add_system_set(SystemSet::on_enter(state).with_system(not_implemented_system));
+    }
+
+    app.add_system_set(SystemSet::on_enter(GameState::Error).with_system(show_error_system));
+    app.run();
+}
+
+fn not_implemented_system(mut game_state: ResMut<State<GameState>>) {
+    println!("Before: {:?}", game_state);
+    game_state.replace(GameState::Error).unwrap();
+    dbg!(game_state);
+}
+
+fn print_state_system(game_state: Res<State<GameState>>) {
+    println!("Now in state {:?}", game_state);
+}
+
+fn show_error_system(mut commands: Commands, asset_server: Res<AssetServer>) {
+    commands.spawn_bundle(create_text(
+        &asset_server,
+        "Something went terribly wrong!",
+        42.6913374711,
+        Color::RED,
+    ));
 }
 
 #[derive(Component)]
@@ -123,6 +159,38 @@ fn despawn_all_with_component<T: Component>(
     }
 }
 
+/// Return a TextBundle
+fn create_text(
+    asset_server: &Res<AssetServer>,
+    text: &str,
+    font_size: f32,
+    color: Color,
+) -> TextBundle {
+    TextBundle {
+        style: Style {
+            align_self: AlignSelf::Center,
+            flex_direction: FlexDirection::Row,
+            ..Default::default()
+        },
+        // Use the `Text::with_section` constructor
+        text: Text::with_section(
+            // Accepts a `String` or any type that converts into a `String`, such as `&str`
+            text,
+            TextStyle {
+                font: asset_server.load("LiberationMono-Regular.ttf"),
+                font_size,
+                color,
+            },
+            // Note: You can use `Default::default()` in place of the `TextAlignment`
+            TextAlignment {
+                horizontal: HorizontalAlign::Center,
+                ..Default::default()
+            },
+        ),
+        ..Default::default()
+    }
+}
+
 mod splash {
     use bevy::app::AppExit;
 
@@ -150,38 +218,6 @@ mod splash {
                     SystemSet::on_exit(GameState::Splash)
                         .with_system(despawn_all_with_component::<OnSplashScreen>),
                 );
-        }
-    }
-
-    /// Return a TextBundle
-    fn create_text(
-        asset_server: &Res<AssetServer>,
-        text: &str,
-        font_size: f32,
-        color: Color,
-    ) -> TextBundle {
-        TextBundle {
-            style: Style {
-                align_self: AlignSelf::Center,
-                flex_direction: FlexDirection::Row,
-                ..Default::default()
-            },
-            // Use the `Text::with_section` constructor
-            text: Text::with_section(
-                // Accepts a `String` or any type that converts into a `String`, such as `&str`
-                text,
-                TextStyle {
-                    font: asset_server.load("LiberationMono-Regular.ttf"),
-                    font_size,
-                    color,
-                },
-                // Note: You can use `Default::default()` in place of the `TextAlignment`
-                TextAlignment {
-                    horizontal: HorizontalAlign::Center,
-                    ..Default::default()
-                },
-            ),
-            ..Default::default()
         }
     }
 
@@ -219,16 +255,18 @@ mod splash {
                     use ButtonID::*;
                     match *id {
                         Solo => game_state.set(GameState::Game).unwrap(),
+                        Multiplayer => game_state.set(GameState::Lobby).unwrap(),
+                        Settings => game_state.set(GameState::Settings).unwrap(),
+                        About => game_state.set(GameState::About).unwrap(),
                         Quit => app_exit_events.send(AppExit),
-                        _ => {}
                     }
-                },
+                }
                 Interaction::Hovered => {
                     *color = UiColor(Color::GRAY);
                 }
                 Interaction::None => {
                     *color = UiColor(Color::BLACK);
-                },
+                }
             }
         }
     }
