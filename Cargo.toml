@@ -1,7 +1,11 @@
 [package]
 name = "game"
 version = "0.1.0"
-authors = ["texel <texelsensei@posteo.net>"]
+authors = [
+    "JohnDoe1112 <johndoe11@posteo.de>",
+    "Lukas Pieger <tadeusteewurst@gmail.com>",
+    "texel <texelsensei@posteo.net>",
+]
 edition = "2021"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
