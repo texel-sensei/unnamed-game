@@ -201,23 +201,34 @@ mod splash {
     }
 
     fn button_system(
-        mut interaction_query: Query<(&Interaction, &ButtonID, Changed<Interaction>), With<Button>>,
+        mut interaction_query: Query<
+            (&Interaction, &ButtonID, &mut UiColor, Changed<Interaction>),
+            With<Button>,
+        >,
         mut game_state: ResMut<State<GameState>>,
         mut app_exit_events: EventWriter<AppExit>,
     ) {
-        for (interaction, id, changed) in interaction_query.iter_mut() {
+        for (interaction, id, mut color, changed) in interaction_query.iter_mut() {
             if !changed {
                 continue;
             }
             println!("Interaction on {:?} {:?}", id, interaction);
 
-            if *interaction == Interaction::Clicked {
-                use ButtonID::*;
-                match *id {
-                    Solo => game_state.set(GameState::Game).unwrap(),
-                    Quit => app_exit_events.send(AppExit),
-                    _ => {}
+            match *interaction {
+                Interaction::Clicked => {
+                    use ButtonID::*;
+                    match *id {
+                        Solo => game_state.set(GameState::Game).unwrap(),
+                        Quit => app_exit_events.send(AppExit),
+                        _ => {}
+                    }
+                },
+                Interaction::Hovered => {
+                    *color = UiColor(Color::GRAY);
                 }
+                Interaction::None => {
+                    *color = UiColor(Color::BLACK);
+                },
             }
         }
     }
