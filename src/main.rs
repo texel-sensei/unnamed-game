@@ -1,6 +1,7 @@
 //! Basic hello world example.
 use bevy::{input::system::exit_on_esc_system, prelude::*};
 
+// Kuhter code
 //                                      /;    ;\
 //                                  __  \\____//
 //                                 /{_\_/   `'\____
@@ -123,6 +124,8 @@ fn despawn_all_with_component<T: Component>(
 }
 
 mod splash {
+    use bevy::app::AppExit;
+
     use super::*;
 
     pub struct SplashPlugin;
@@ -130,9 +133,19 @@ mod splash {
     #[derive(Component)]
     struct OnSplashScreen;
 
+    #[derive(Component, Debug, PartialEq, Eq, Clone, Copy)]
+    enum ButtonID {
+        Solo,
+        Multiplayer,
+        Quit,
+        About,
+        Settings,
+    }
+
     impl Plugin for SplashPlugin {
         fn build(&self, app: &mut App) {
             app.add_system_set(SystemSet::on_enter(GameState::Splash).with_system(splash_setup))
+                .add_system_set(SystemSet::on_update(GameState::Splash).with_system(button_system))
                 .add_system_set(
                     SystemSet::on_exit(GameState::Splash)
                         .with_system(despawn_all_with_component::<OnSplashScreen>),
@@ -172,6 +185,43 @@ mod splash {
         }
     }
 
+    fn create_button<T>(commands: &mut ChildBuilder, id: ButtonID, child: T)
+    where
+        T: Bundle,
+    {
+        commands
+            .spawn_bundle(ButtonBundle {
+                color: UiColor(Color::BLACK),
+                ..Default::default()
+            })
+            .with_children(|parent| {
+                parent.spawn_bundle(child);
+            })
+            .insert(id);
+    }
+
+    fn button_system(
+        mut interaction_query: Query<(&Interaction, &ButtonID, Changed<Interaction>), With<Button>>,
+        mut game_state: ResMut<State<GameState>>,
+        mut app_exit_events: EventWriter<AppExit>,
+    ) {
+        for (interaction, id, changed) in interaction_query.iter_mut() {
+            if !changed {
+                continue;
+            }
+            println!("Interaction on {:?} {:?}", id, interaction);
+
+            if *interaction == Interaction::Clicked {
+                use ButtonID::*;
+                match *id {
+                    Solo => game_state.set(GameState::Game).unwrap(),
+                    Quit => app_exit_events.send(AppExit),
+                    _ => {}
+                }
+            }
+        }
+    }
+
     fn splash_setup(mut commands: Commands, asset_server: Res<AssetServer>) {
         println!("Entered splash screen!");
         commands
@@ -203,7 +253,6 @@ mod splash {
                             flex_direction: FlexDirection::ColumnReverse,
                             ..Default::default()
                         },
-                        color: Color::BLACK.into(),
                         ..Default::default()
                     })
                     // Add main buttons
@@ -212,9 +261,12 @@ mod splash {
                         let multi = create_text(&asset_server, "Multiplayer", 50.0, Color::GOLD);
                         let quit = create_text(&asset_server, "Quit", 50.0, Color::ANTIQUE_WHITE);
                         let padding = Rect::all(Val::Px(15.0));
-                        for mut bundle in vec![solo, multi, quit] {
+                        use ButtonID::*;
+                        for (mut bundle, id) in
+                            vec![(solo, Solo), (multi, Multiplayer), (quit, Quit)]
+                        {
                             bundle.style.margin = padding;
-                            parent.spawn_bundle(bundle);
+                            create_button(parent, id, bundle);
                         }
                     });
                 parent
@@ -235,9 +287,10 @@ mod splash {
                         let about = create_text(&asset_server, "?", 50.0, Color::WHITE);
                         let settings = create_text(&asset_server, "\u{2699}", 50.0, Color::GOLD);
                         let padding = Rect::all(Val::Px(15.0));
-                        for mut bundle in vec![about, settings] {
+                        use ButtonID::*;
+                        for (mut bundle, id) in vec![(about, About), (settings, Settings)] {
                             bundle.style.margin = padding;
-                            parent.spawn_bundle(bundle);
+                            create_button(parent, id, bundle);
                         }
                     });
             });
