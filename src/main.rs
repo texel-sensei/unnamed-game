@@ -50,34 +50,6 @@ fn setup(mut commands: Commands, asset_server: Res<AssetServer>) {
     let texture_handle = asset_server.load("awesome-square.png");
     commands.spawn_bundle(UiCameraBundle::default());
     commands.spawn_bundle(OrthographicCameraBundle::new_2d());
-    commands.spawn_bundle(TextBundle {
-        style: Style {
-            align_self: AlignSelf::FlexEnd,
-            position_type: PositionType::Absolute,
-            position: Rect {
-                bottom: Val::Px(5.0),
-                right: Val::Px(15.0),
-                ..Default::default()
-            },
-            ..Default::default()
-        },
-        // Use the `Text::with_section` constructor
-        text: Text::with_section(
-            // Accepts a `String` or any type that converts into a `String`, such as `&str`
-            "hello\nbevy!",
-            TextStyle {
-                font: asset_server.load("LiberationMono-Regular.ttf"),
-                font_size: 100.0,
-                color: Color::BLACK,
-            },
-            // Note: You can use `Default::default()` in place of the `TextAlignment`
-            TextAlignment {
-                horizontal: HorizontalAlign::Center,
-                ..Default::default()
-            },
-        ),
-        ..Default::default()
-    });
     commands
         .spawn_bundle(SpriteBundle {
             texture: texture_handle,
@@ -141,7 +113,10 @@ fn keyboard_input_system(
 }
 
 /// Generic system that takes a component as a parameter, and will despawn all entities with that component
-fn despawn_all_with_component<T: Component>(to_despawn: Query<Entity, With<T>>, mut commands: Commands) {
+fn despawn_all_with_component<T: Component>(
+    to_despawn: Query<Entity, With<T>>,
+    mut commands: Commands,
+) {
     for entity in to_despawn.iter() {
         commands.entity(entity).despawn_recursive();
     }
@@ -158,31 +133,34 @@ mod splash {
     impl Plugin for SplashPlugin {
         fn build(&self, app: &mut App) {
             app.add_system_set(SystemSet::on_enter(GameState::Splash).with_system(splash_setup))
-                .add_system_set(SystemSet::on_exit(GameState::Splash).with_system(despawn_all_with_component::<OnSplashScreen>));
+                .add_system_set(
+                    SystemSet::on_exit(GameState::Splash)
+                        .with_system(despawn_all_with_component::<OnSplashScreen>),
+                );
         }
     }
 
-    fn splash_setup(mut commands: Commands, asset_server: Res<AssetServer>) {
-        println!("Entered splash screen!");
-        commands.spawn_bundle(TextBundle {
+    /// Return a TextBundle
+    fn create_text(
+        asset_server: &Res<AssetServer>,
+        text: &str,
+        font_size: f32,
+        color: Color,
+    ) -> TextBundle {
+        TextBundle {
             style: Style {
-                align_self: AlignSelf::FlexEnd,
-                position_type: PositionType::Absolute,
-                position: Rect {
-                    bottom: Val::Px(5.0),
-                    left: Val::Px(15.0),
-                    ..Default::default()
-                },
+                align_self: AlignSelf::Center,
+                flex_direction: FlexDirection::Row,
                 ..Default::default()
             },
             // Use the `Text::with_section` constructor
             text: Text::with_section(
                 // Accepts a `String` or any type that converts into a `String`, such as `&str`
-                "hello\nbevy!",
+                text,
                 TextStyle {
                     font: asset_server.load("LiberationMono-Regular.ttf"),
-                    font_size: 100.0,
-                    color: Color::BLACK,
+                    font_size,
+                    color,
                 },
                 // Note: You can use `Default::default()` in place of the `TextAlignment`
                 TextAlignment {
@@ -191,6 +169,77 @@ mod splash {
                 },
             ),
             ..Default::default()
-        }).insert(OnSplashScreen);
+        }
+    }
+
+    fn splash_setup(mut commands: Commands, asset_server: Res<AssetServer>) {
+        println!("Entered splash screen!");
+        commands
+            // Layout whole screen
+            .spawn_bundle(NodeBundle {
+                style: Style {
+                    size: Size::new(Val::Percent(100.0), Val::Percent(100.0)),
+                    justify_content: JustifyContent::SpaceBetween,
+                    flex_direction: FlexDirection::ColumnReverse,
+                    ..Default::default()
+                },
+                ..Default::default()
+            })
+            .insert(OnSplashScreen)
+            // Add title
+            .with_children(|parent| {
+                let mut title = create_text(&asset_server, "Unnamed Game", 100.0, Color::BLACK);
+                let padding = Rect::all(Val::Px(40.0));
+                title.style.margin = padding;
+
+                parent.spawn_bundle(title);
+                parent
+                    // Add layout for main buttons
+                    .spawn_bundle(NodeBundle {
+                        style: Style {
+                            align_self: AlignSelf::Center,
+                            align_items: AlignItems::Stretch,
+                            justify_content: JustifyContent::SpaceEvenly,
+                            flex_direction: FlexDirection::ColumnReverse,
+                            ..Default::default()
+                        },
+                        color: Color::BLACK.into(),
+                        ..Default::default()
+                    })
+                    // Add main buttons
+                    .with_children(|parent| {
+                        let solo = create_text(&asset_server, "Solo", 50.0, Color::WHITE);
+                        let multi = create_text(&asset_server, "Multiplayer", 50.0, Color::GOLD);
+                        let quit = create_text(&asset_server, "Quit", 50.0, Color::ANTIQUE_WHITE);
+                        let padding = Rect::all(Val::Px(15.0));
+                        for mut bundle in vec![solo, multi, quit] {
+                            bundle.style.margin = padding;
+                            parent.spawn_bundle(bundle);
+                        }
+                    });
+                parent
+                    // Layout for settings and about buttons
+                    .spawn_bundle(NodeBundle {
+                        style: Style {
+                            align_self: AlignSelf::Stretch,
+                            align_items: AlignItems::Stretch,
+                            justify_content: JustifyContent::SpaceBetween,
+                            flex_direction: FlexDirection::Row,
+                            ..Default::default()
+                        },
+                        color: Color::BLACK.into(),
+                        ..Default::default()
+                    })
+                    // Add settings and about buttons
+                    .with_children(|parent| {
+                        let about = create_text(&asset_server, "?", 50.0, Color::WHITE);
+                        let settings = create_text(&asset_server, "\u{2699}", 50.0, Color::GOLD);
+                        let padding = Rect::all(Val::Px(15.0));
+                        for mut bundle in vec![about, settings] {
+                            bundle.style.margin = padding;
+                            parent.spawn_bundle(bundle);
+                        }
+                    });
+            });
     }
 }
