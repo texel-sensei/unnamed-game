@@ -1,6 +1,7 @@
 //! Basic hello world example.
 use bevy::{input::system::exit_on_esc_system, prelude::*};
 
+// Kuhter code
 //                                      /;    ;\
 //                                  __  \\____//
 //                                 /{_\_/   `'\____
@@ -23,12 +24,17 @@ use bevy::{input::system::exit_on_esc_system, prelude::*};
 // Enum that will be used as a global state for the game
 #[derive(Clone, Eq, PartialEq, Debug, Hash)]
 enum GameState {
-    Splash,
+    About,
+    Error,
     Game,
+    Lobby,
+    Settings,
+    Splash,
 }
 
 fn main() {
-    App::new()
+    let mut app = App::new();
+    app
         .add_plugins(DefaultPlugins)
         .add_startup_system(setup)
         .add_system(keyboard_input_system)
@@ -37,7 +43,38 @@ fn main() {
         .add_state(GameState::Splash)
         .add_plugin(splash::SplashPlugin)
         // .add_plugin(game::GamePlugin)
-        .run();
+        ;
+
+    for state in vec![About, Error, Game, Lobby, Settings, Splash] {
+        app.add_system_set(SystemSet::on_enter(state).with_system(print_state_system));
+    }
+
+    use GameState::*;
+    for state in vec![About, Lobby, Settings] {
+        app.add_system_set(SystemSet::on_enter(state).with_system(not_implemented_system));
+    }
+
+    app.add_system_set(SystemSet::on_enter(GameState::Error).with_system(show_error_system));
+    app.run();
+}
+
+fn not_implemented_system(mut game_state: ResMut<State<GameState>>) {
+    println!("Before: {:?}", game_state);
+    game_state.replace(GameState::Error).unwrap();
+    dbg!(game_state);
+}
+
+fn print_state_system(game_state: Res<State<GameState>>) {
+    println!("Now in state {:?}", game_state);
+}
+
+fn show_error_system(mut commands: Commands, asset_server: Res<AssetServer>) {
+    commands.spawn_bundle(create_text(
+        &asset_server,
+        "Something went terribly wrong!",
+        42.6913374711,
+        Color::RED,
+    ));
 }
 
 #[derive(Component)]
@@ -122,7 +159,41 @@ fn despawn_all_with_component<T: Component>(
     }
 }
 
+/// Return a TextBundle
+fn create_text(
+    asset_server: &Res<AssetServer>,
+    text: &str,
+    font_size: f32,
+    color: Color,
+) -> TextBundle {
+    TextBundle {
+        style: Style {
+            align_self: AlignSelf::Center,
+            flex_direction: FlexDirection::Row,
+            ..Default::default()
+        },
+        // Use the `Text::with_section` constructor
+        text: Text::with_section(
+            // Accepts a `String` or any type that converts into a `String`, such as `&str`
+            text,
+            TextStyle {
+                font: asset_server.load("LiberationMono-Regular.ttf"),
+                font_size,
+                color,
+            },
+            // Note: You can use `Default::default()` in place of the `TextAlignment`
+            TextAlignment {
+                horizontal: HorizontalAlign::Center,
+                ..Default::default()
+            },
+        ),
+        ..Default::default()
+    }
+}
+
 mod splash {
+    use bevy::app::AppExit;
+
     use super::*;
 
     pub struct SplashPlugin;
@@ -130,9 +201,19 @@ mod splash {
     #[derive(Component)]
     struct OnSplashScreen;
 
+    #[derive(Component, Debug, PartialEq, Eq, Clone, Copy)]
+    enum ButtonID {
+        Solo,
+        Multiplayer,
+        Quit,
+        About,
+        Settings,
+    }
+
     impl Plugin for SplashPlugin {
         fn build(&self, app: &mut App) {
             app.add_system_set(SystemSet::on_enter(GameState::Splash).with_system(splash_setup))
+                .add_system_set(SystemSet::on_update(GameState::Splash).with_system(button_system))
                 .add_system_set(
                     SystemSet::on_exit(GameState::Splash)
                         .with_system(despawn_all_with_component::<OnSplashScreen>),
@@ -140,35 +221,53 @@ mod splash {
         }
     }
 
-    /// Return a TextBundle
-    fn create_text(
-        asset_server: &Res<AssetServer>,
-        text: &str,
-        font_size: f32,
-        color: Color,
-    ) -> TextBundle {
-        TextBundle {
-            style: Style {
-                align_self: AlignSelf::Center,
-                flex_direction: FlexDirection::Row,
+    fn create_button<T>(commands: &mut ChildBuilder, id: ButtonID, child: T)
+    where
+        T: Bundle,
+    {
+        commands
+            .spawn_bundle(ButtonBundle {
+                color: UiColor(Color::BLACK),
                 ..Default::default()
-            },
-            // Use the `Text::with_section` constructor
-            text: Text::with_section(
-                // Accepts a `String` or any type that converts into a `String`, such as `&str`
-                text,
-                TextStyle {
-                    font: asset_server.load("LiberationMono-Regular.ttf"),
-                    font_size,
-                    color,
-                },
-                // Note: You can use `Default::default()` in place of the `TextAlignment`
-                TextAlignment {
-                    horizontal: HorizontalAlign::Center,
-                    ..Default::default()
-                },
-            ),
-            ..Default::default()
+            })
+            .with_children(|parent| {
+                parent.spawn_bundle(child);
+            })
+            .insert(id);
+    }
+
+    fn button_system(
+        mut interaction_query: Query<
+            (&Interaction, &ButtonID, &mut UiColor, Changed<Interaction>),
+            With<Button>,
+        >,
+        mut game_state: ResMut<State<GameState>>,
+        mut app_exit_events: EventWriter<AppExit>,
+    ) {
+        for (interaction, id, mut color, changed) in interaction_query.iter_mut() {
+            if !changed {
+                continue;
+            }
+            println!("Interaction on {:?} {:?}", id, interaction);
+
+            match *interaction {
+                Interaction::Clicked => {
+                    use ButtonID::*;
+                    match *id {
+                        Solo => game_state.set(GameState::Game).unwrap(),
+                        Multiplayer => game_state.set(GameState::Lobby).unwrap(),
+                        Settings => game_state.set(GameState::Settings).unwrap(),
+                        About => game_state.set(GameState::About).unwrap(),
+                        Quit => app_exit_events.send(AppExit),
+                    }
+                }
+                Interaction::Hovered => {
+                    *color = UiColor(Color::GRAY);
+                }
+                Interaction::None => {
+                    *color = UiColor(Color::BLACK);
+                }
+            }
         }
     }
 
@@ -203,7 +302,6 @@ mod splash {
                             flex_direction: FlexDirection::ColumnReverse,
                             ..Default::default()
                         },
-                        color: Color::BLACK.into(),
                         ..Default::default()
                     })
                     // Add main buttons
@@ -212,9 +310,12 @@ mod splash {
                         let multi = create_text(&asset_server, "Multiplayer", 50.0, Color::GOLD);
                         let quit = create_text(&asset_server, "Quit", 50.0, Color::ANTIQUE_WHITE);
                         let padding = Rect::all(Val::Px(15.0));
-                        for mut bundle in vec![solo, multi, quit] {
+                        use ButtonID::*;
+                        for (mut bundle, id) in
+                            vec![(solo, Solo), (multi, Multiplayer), (quit, Quit)]
+                        {
                             bundle.style.margin = padding;
-                            parent.spawn_bundle(bundle);
+                            create_button(parent, id, bundle);
                         }
                     });
                 parent
@@ -235,9 +336,10 @@ mod splash {
                         let about = create_text(&asset_server, "?", 50.0, Color::WHITE);
                         let settings = create_text(&asset_server, "\u{2699}", 50.0, Color::GOLD);
                         let padding = Rect::all(Val::Px(15.0));
-                        for mut bundle in vec![about, settings] {
+                        use ButtonID::*;
+                        for (mut bundle, id) in vec![(about, About), (settings, Settings)] {
                             bundle.style.margin = padding;
-                            parent.spawn_bundle(bundle);
+                            create_button(parent, id, bundle);
                         }
                     });
             });
