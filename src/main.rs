@@ -1,5 +1,10 @@
 //! Basic hello world example.
+use common_macros::hash_map;
+
 use bevy::{input::system::exit_on_esc_system, prelude::*};
+use input::ActionQueue;
+
+mod input;
 
 // Kuhter code
 //                                      /;    ;\
@@ -38,6 +43,7 @@ fn main() {
         .add_plugins(DefaultPlugins)
         .add_startup_system(setup)
         .add_system(keyboard_input_system)
+        .add_system(square_move_system)
         .add_system(exit_on_esc_system)
         .add_system(state_change_system)
         .add_state(GameState::Splash)
@@ -78,10 +84,11 @@ fn show_error_system(mut commands: Commands, asset_server: Res<AssetServer>) {
 }
 
 #[derive(Component)]
-struct Player;
+struct Player(u32);
 
 #[derive(Component)]
 struct Velocity(Vec3);
+
 
 fn setup(mut commands: Commands, asset_server: Res<AssetServer>) {
     let texture_handle = asset_server.load("awesome-square.png");
@@ -89,11 +96,22 @@ fn setup(mut commands: Commands, asset_server: Res<AssetServer>) {
     commands.spawn_bundle(OrthographicCameraBundle::new_2d());
     commands
         .spawn_bundle(SpriteBundle {
-            texture: texture_handle,
+            texture: texture_handle.clone(),
             transform: Transform::from_xyz(300.1, 10.0, 10.0),
             ..Default::default()
         })
-        .insert(Player);
+        .insert(Player(0))
+        .insert(ActionQueue::new())
+        ;
+    commands
+        .spawn_bundle(SpriteBundle {
+            texture: texture_handle.clone(),
+            transform: Transform::from_xyz(310.1, 10.0, 10.0),
+            ..Default::default()
+        })
+        .insert(Player(1))
+        .insert(ActionQueue::new())
+        ;
 }
 
 fn state_change_system(
@@ -112,40 +130,66 @@ fn state_change_system(
 
 /// This system moves the square
 fn keyboard_input_system(
-    mut query: Query<&mut Transform, With<Player>>,
+    mut query: Query<(&Player, &mut ActionQueue)>,
     keyboard_input: Res<Input<KeyCode>>,
 ) {
-    let mut delta = Vec3::default();
-    let mut size_delta = Vec3::default();
-    let speed = 20.0;
+    use input::Action::*;
 
-    if keyboard_input.pressed(KeyCode::W) {
-        delta.y += speed;
+    let keybindings = vec![
+        hash_map! {
+            Up => KeyCode::W,
+            Left => KeyCode::A,
+            Down => KeyCode::S,
+            Right => KeyCode::D,
+        },
+        hash_map! {
+            Up => KeyCode::Up,
+            Left => KeyCode::Left,
+            Down => KeyCode::Down,
+            Right => KeyCode::Right,
+        },
+    ];
+
+    let all_actions = vec![Left, Right, Up, Down];
+
+    for (player, mut actions) in query.iter_mut() {
+        let bindings = &keybindings[player.0 as usize];
+
+        let pressed_actions = all_actions.iter()
+            .filter(|a| keyboard_input.pressed(bindings[a]))
+            ;
+
+        actions.update(pressed_actions);
     }
+}
 
-    if keyboard_input.pressed(KeyCode::A) {
-        delta.x -= speed;
-    }
+/// This is the thing that does that our square moves (#7)
+fn square_move_system(
+    mut query: Query<(&mut Transform, &ActionQueue), With<Player>>
+) {
+    for (mut transform, actions) in query.iter_mut() {
+        let mut delta = Vec3::default();
+        let speed = 20.0;
 
-    if keyboard_input.pressed(KeyCode::S) {
-        delta.y -= speed;
-    }
+        use input::Action::*;
 
-    if keyboard_input.pressed(KeyCode::D) {
-        delta.x += speed;
-    }
+        if actions.is_pressed(Up) {
+            delta.y += speed;
+        }
 
-    if keyboard_input.pressed(KeyCode::Q) {
-        size_delta += 1.0;
-    }
+        if actions.is_pressed(Left) {
+            delta.x -= speed;
+        }
 
-    if keyboard_input.pressed(KeyCode::E) {
-        size_delta -= 1.0;
-    }
+        if actions.is_pressed(Down) {
+            delta.y -= speed;
+        }
 
-    for mut transform in query.iter_mut() {
+        if actions.is_pressed(Right) {
+            delta.x += speed;
+        }
+
         transform.translation += delta;
-        transform.scale += size_delta;
     }
 }
 
