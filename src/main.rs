@@ -89,7 +89,6 @@ struct Player(u32);
 #[derive(Component)]
 struct Velocity(Vec3);
 
-
 fn setup(mut commands: Commands, asset_server: Res<AssetServer>) {
     let texture_handle = asset_server.load("awesome-square.png");
     commands.spawn_bundle(UiCameraBundle::default());
@@ -101,8 +100,7 @@ fn setup(mut commands: Commands, asset_server: Res<AssetServer>) {
             ..Default::default()
         })
         .insert(Player(0))
-        .insert(ActionQueue::new())
-        ;
+        .insert(ActionQueue::new());
     commands
         .spawn_bundle(SpriteBundle {
             texture: texture_handle.clone(),
@@ -110,8 +108,7 @@ fn setup(mut commands: Commands, asset_server: Res<AssetServer>) {
             ..Default::default()
         })
         .insert(Player(1))
-        .insert(ActionQueue::new())
-        ;
+        .insert(ActionQueue::new());
 }
 
 fn state_change_system(
@@ -155,18 +152,16 @@ fn keyboard_input_system(
     for (player, mut actions) in query.iter_mut() {
         let bindings = &keybindings[player.0 as usize];
 
-        let pressed_actions = all_actions.iter()
-            .filter(|a| keyboard_input.pressed(bindings[a]))
-            ;
+        let pressed_actions = all_actions
+            .iter()
+            .filter(|a| keyboard_input.pressed(bindings[a]));
 
         actions.update(pressed_actions);
     }
 }
 
 /// This is the thing that does that our square moves (#7)
-fn square_move_system(
-    mut query: Query<(&mut Transform, &ActionQueue), With<Player>>
-) {
+fn square_move_system(mut query: Query<(&mut Transform, &ActionQueue), With<Player>>) {
     for (mut transform, actions) in query.iter_mut() {
         let mut delta = Vec3::default();
         let speed = 20.0;

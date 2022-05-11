@@ -21,18 +21,24 @@ fn is_pressed(bitset: u8, action: Action) -> bool {
 }
 
 impl ActionQueue {
-
-    pub fn new() -> Self { Self { current_frame: 0, last_frame: 0 } }
+    pub fn new() -> Self {
+        Self {
+            current_frame: 0,
+            last_frame: 0,
+        }
+    }
 
     /// Add the input for a new frame to the ActionQueue.
-    pub fn update<I,E>(&mut self, currently_pressed: I)
-        where
-            I: IntoIterator<Item=E>,
-            E: Borrow<Action>
+    pub fn update<I, E>(&mut self, currently_pressed: I)
+    where
+        I: IntoIterator<Item = E>,
+        E: Borrow<Action>,
     {
         self.last_frame = self.current_frame;
-        self.current_frame = currently_pressed.into_iter()
-            .map(|a| *a.borrow() as u8).sum();
+        self.current_frame = currently_pressed
+            .into_iter()
+            .map(|a| *a.borrow() as u8)
+            .sum();
     }
 
     pub fn just_pressed(&self, action: Action) -> bool {
@@ -46,13 +52,11 @@ impl ActionQueue {
     pub fn just_released(&self, action: Action) -> bool {
         !is_pressed(self.current_frame, action) && is_pressed(self.last_frame, action)
     }
-
 }
 
 #[cfg(test)]
 mod test {
     use super::*;
-
 
     #[test]
     fn new_queue_has_nothing_pressed() {
