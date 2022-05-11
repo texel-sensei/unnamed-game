@@ -74,6 +74,7 @@ fn print_state_system(game_state: Res<State<GameState>>) {
     println!("Now in state {:?}", game_state);
 }
 
+#[allow(clippy::excessive_precision)]
 fn show_error_system(mut commands: Commands, asset_server: Res<AssetServer>) {
     commands.spawn_bundle(create_text(
         &asset_server,
@@ -103,7 +104,7 @@ fn setup(mut commands: Commands, asset_server: Res<AssetServer>) {
         .insert(ActionQueue::new());
     commands
         .spawn_bundle(SpriteBundle {
-            texture: texture_handle.clone(),
+            texture: texture_handle,
             transform: Transform::from_xyz(310.1, 10.0, 10.0),
             ..Default::default()
         })
@@ -198,7 +199,7 @@ fn despawn_all_with_component<T: Component>(
     }
 }
 
-/// Return a TextBundle
+/// Return a `TextBundle`
 fn create_text(
     asset_server: &Res<AssetServer>,
     text: &str,
